@@ -1,0 +1,79 @@
+asyncapi: 2.6.0
+
+info:
+  title: CampusLab RabbitMQ
+  version: 1.0.0
+
+servers:
+  rabbitmq:
+    url: localhost:5672
+    protocol: amqp
+
+channels:
+
+  q.cmd.email:
+    publish:
+      message:
+        $ref: '#/components/messages/CommandMessage'
+
+  q.cmd.email.dlq:
+    subscribe:
+      message:
+        $ref: '#/components/messages/CommandMessage'
+
+  q.cmd.prep:
+    publish:
+      message:
+        $ref: '#/components/messages/CommandMessage'
+
+  q.cmd.prep.dlq:
+    subscribe:
+      message:
+        $ref: '#/components/messages/CommandMessage'
+
+  q.cmd.voucher:
+    publish:
+      message:
+        $ref: '#/components/messages/CommandMessage'
+
+  q.cmd.voucher.dlq:
+    subscribe:
+      message:
+        $ref: '#/components/messages/CommandMessage'
+
+components:
+
+  messages:
+
+    CommandMessage:
+      payload:
+        type: object
+        required:
+          - type
+          - eventId
+          - timestamp
+          - traceId
+          - correlationId
+          - payload
+
+        properties:
+
+          type:
+            type: string
+
+          eventId:
+            type: string
+
+          timestamp:
+            type: string
+            format: date-time
+
+          traceId:
+            type: string
+
+          correlationId:
+            type: string
+
+          payload:
+            type: object
+            additionalProperties: true
