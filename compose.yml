@@ -1,0 +1,69 @@
+services:
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    container_name: campuslab-rabbitmq
+    hostname: campuslab-rabbitmq
+    restart: unless-stopped
+
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+
+    ports:
+      - "5672:5672"     # AMQP (microservicios)
+      - "15672:15672"   # RabbitMQ Management (UI web)
+
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+    networks:
+      - campuslab-network
+
+
+  
+  rabbitmq-init:
+    image: curlimages/curl:8.10.1
+    container_name: campuslab-rabbitmq-init
+    restart: "no"
+
+    environment:
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+
+    volumes:
+      - ./definitions.json:/definitions.json:ro
+
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        curl -sS --fail-with-body
+        -u "$$RABBITMQ_USER:$$RABBITMQ_PASSWORD"
+        -H "Content-Type: application/json"
+        -X POST
+        --data-binary @/definitions.json
+        http://rabbitmq:15672/api/definitions
+        && echo "Topologia CampusLab cargada OK"
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+    networks:
+      - campuslab-network
+
+
+volumes:
+  rabbitmq-data:
+
+
+networks:
+  campuslab-network:
+    name: campuslab-network
+    driver: bridge
