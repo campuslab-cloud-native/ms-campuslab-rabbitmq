@@ -3,6 +3,7 @@ asyncapi: 2.6.0
 info:
   title: CampusLab RabbitMQ
   version: 1.0.0
+  description: Topología oficial de mensajería para CampusLab.
 
 servers:
   rabbitmq:
@@ -10,42 +11,54 @@ servers:
     protocol: amqp
 
 channels:
+  cmd.direct:
+    publish:
+      message:
+        $ref: '#/components/messages/CommandEnvelope'
+
+  cmd.topic:
+    publish:
+      message:
+        $ref: '#/components/messages/CommandEnvelope'
+
+  cmd.dead.dlx:
+    subscribe:
+      message:
+        $ref: '#/components/messages/CommandEnvelope'
 
   q.cmd.email:
     publish:
       message:
-        $ref: '#/components/messages/CommandMessage'
+        $ref: '#/components/messages/CommandEnvelope'
 
   q.cmd.email.dlq:
     subscribe:
       message:
-        $ref: '#/components/messages/CommandMessage'
+        $ref: '#/components/messages/CommandEnvelope'
 
   q.cmd.prep:
     publish:
       message:
-        $ref: '#/components/messages/CommandMessage'
+        $ref: '#/components/messages/CommandEnvelope'
 
   q.cmd.prep.dlq:
     subscribe:
       message:
-        $ref: '#/components/messages/CommandMessage'
+        $ref: '#/components/messages/CommandEnvelope'
 
   q.cmd.voucher:
     publish:
       message:
-        $ref: '#/components/messages/CommandMessage'
+        $ref: '#/components/messages/CommandEnvelope'
 
   q.cmd.voucher.dlq:
     subscribe:
       message:
-        $ref: '#/components/messages/CommandMessage'
+        $ref: '#/components/messages/CommandEnvelope'
 
 components:
-
   messages:
-
-    CommandMessage:
+    CommandEnvelope:
       payload:
         type: object
         required:
@@ -55,25 +68,41 @@ components:
           - traceId
           - correlationId
           - payload
-
         properties:
-
           type:
             type: string
-
+            description: Tipo del evento o comando.
           eventId:
             type: string
-
+            description: Identificador único del evento.
           timestamp:
             type: string
             format: date-time
-
+            description: Fecha y hora del evento.
           traceId:
             type: string
-
+            description: Identificador de trazabilidad.
           correlationId:
             type: string
-
+            description: Identificador de correlación.
           payload:
             type: object
             additionalProperties: true
+            description: Carga útil del comando.
+
+  bindings:
+    cmdDirect:
+      amqp:
+        is: routingKey
+        exchange: cmd.direct
+        bindingVersion: '0.1.0'
+    cmdTopic:
+      amqp:
+        is: routingKey
+        exchange: cmd.topic
+        bindingVersion: '0.1.0'
+    deadLetterBinding:
+      amqp:
+        is: routingKey
+        exchange: cmd.dead.dlx
+        bindingVersion: '0.1.0'
