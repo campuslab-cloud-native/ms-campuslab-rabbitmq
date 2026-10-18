@@ -87,19 +87,19 @@ Cada cola principal está configurada con `x-dead-letter-exchange=cmd.dead.dlx` 
 
 ## Rabbit Admin REST
 
-La API administrativa expone los recursos bajo el prefijo `/api/rabbit`.
+La API administrativa expone los recursos bajo el prefijo `/api/v1/rabbit`.
 
 ### Endpoints
 
 ```http
-POST   /api/rabbit/queues
-DELETE /api/rabbit/queues/{name}
+POST   /api/v1/rabbit/queues
+DELETE /api/v1/rabbit/queues/{name}
 
-POST   /api/rabbit/exchanges
-DELETE /api/rabbit/exchanges/{name}
+POST   /api/v1/rabbit/exchanges
+DELETE /api/v1/rabbit/exchanges/{name}
 
-POST   /api/rabbit/bindings
-DELETE /api/rabbit/bindings
+POST   /api/v1/rabbit/bindings
+DELETE /api/v1/rabbit/bindings
 ```
 
 ## Variables de entorno

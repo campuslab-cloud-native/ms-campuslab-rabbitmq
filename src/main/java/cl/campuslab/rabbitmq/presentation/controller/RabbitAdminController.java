@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/rabbit")
+@RequestMapping("/api/v1/rabbit")
 public class RabbitAdminController {
 
     private final RabbitAdminService rabbitAdminService;
