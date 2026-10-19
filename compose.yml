@@ -1,54 +1,104 @@
 services:
-  rabbitmq:
+
+  rabbitmq-1:
     image: rabbitmq:3.13-management
-    container_name: campuslab-rabbitmq
-    hostname: campuslab-rabbitmq
+    container_name: campuslab-rabbitmq-1
+    hostname: rabbitmq-1
     restart: unless-stopped
+
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-campuslab-cookie}
+
     ports:
       - "5672:5672"
       - "15672:15672"
+
     volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
+      - rabbitmq-data-1:/var/lib/rabbitmq
+
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 20s
+
     networks:
       - campuslab-mq-network
+
+
+  rabbitmq-2:
+    image: rabbitmq:3.13-management
+    container_name: campuslab-rabbitmq-2
+    hostname: rabbitmq-2
+    restart: unless-stopped
+
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-campuslab-cookie}
+
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+
+    volumes:
+      - rabbitmq-data-2:/var/lib/rabbitmq
+
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+    networks:
+      - campuslab-mq-network
+
 
   rabbit-admin:
     build:
       context: .
       dockerfile: Dockerfile
+
     container_name: campuslab-rabbit-admin
     restart: unless-stopped
+
     environment:
       SERVER_PORT: 8087
-      RABBITMQ_HOST: rabbitmq
+
+      RABBITMQ_HOST: rabbitmq-1
       RABBITMQ_PORT: 5672
+
       RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+
     depends_on:
-      rabbitmq:
+      rabbitmq-1:
         condition: service_healthy
+      rabbitmq-2:
+        condition: service_healthy
+
     ports:
       - "8087:8087"
+
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8087/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 12
       start_period: 30s
+
     networks:
       - campuslab-mq-network
 
+
 volumes:
-  rabbitmq-data:
+  rabbitmq-data-1:
+  rabbitmq-data-2:
+
 
 networks:
   campuslab-mq-network:
