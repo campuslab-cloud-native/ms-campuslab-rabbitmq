@@ -7,7 +7,11 @@ import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.context.annotation.Bean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -16,7 +20,7 @@ class RabbitTopologyConfigTest {
 
     @Test
     void staticTopologyShouldBeDeclared() {
-        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(RabbitTopologyConfig.class)) {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(RabbitTopologyConfig.class, TestRabbitConfiguration.class)) {
             assertEquals(MessagingNames.DIRECT_EXCHANGE, context.getBean("cmdDirectExchange", DirectExchange.class).getName());
             assertEquals(MessagingNames.TOPIC_EXCHANGE, context.getBean("cmdTopicExchange", TopicExchange.class).getName());
             assertEquals(MessagingNames.DEAD_LETTER_EXCHANGE, context.getBean("cmdDeadLetterExchange", DirectExchange.class).getName());
@@ -37,6 +41,14 @@ class RabbitTopologyConfigTest {
             assertNotNull(context.getBean("emailDeadLetterBinding", Binding.class));
             assertNotNull(context.getBean("prepDeadLetterBinding", Binding.class));
             assertNotNull(context.getBean("voucherDeadLetterBinding", Binding.class));
+        }
+    }
+
+    @TestConfiguration
+    static class TestRabbitConfiguration {
+        @Bean
+        ConnectionFactory connectionFactory() {
+            return new CachingConnectionFactory("localhost");
         }
     }
 }
