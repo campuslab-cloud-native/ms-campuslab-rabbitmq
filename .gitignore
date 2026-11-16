@@ -2,6 +2,8 @@
 .env.*
 !.env.example
 target/
+.mvn/apache-maven-*/
+build.log
 .git/
 .idea/
 *.iml
