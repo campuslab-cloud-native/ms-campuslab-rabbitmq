@@ -9,13 +9,28 @@ RabbitMQ infrastructure and Rabbit Admin API for CampusLab.
 | Service | Host ports | Purpose |
 |---|---|---|
 | `rabbitmq-1` | `5672`, `15672` | Broker used by Rabbit Admin in this Compose |
-| `rabbitmq-2` | `5673`, `15673` | Second independent broker container |
+| `rabbitmq-2` | `5673`, `15673` | Second broker; joins the cluster formed with `rabbitmq-1` |
 | `rabbit-admin` | `8087` | Spring Boot API for dynamic queues, exchanges and bindings |
 
-Both broker containers have separate data volumes. The Compose file does not
-join them into a RabbitMQ cluster; `rabbit-admin` connects only to
-`rabbitmq-1`. Do not infer replication or automatic failover from the two
-containers.
+Both brokers share the same Erlang cookie and mount [`rabbitmq.conf`](./rabbitmq.conf),
+which enables `classic_config` peer discovery: on first start with an empty data
+volume, `rabbitmq-2` joins `rabbit@rabbitmq-1` and they form a two-node cluster.
+`rabbitmq-2` waits for `rabbitmq-1` to be healthy before starting. `rabbit-admin`
+connects only to `rabbitmq-1`.
+
+Check the cluster with:
+
+```bash
+docker exec campuslab-rabbitmq-1 rabbitmqctl cluster_status
+```
+
+Peer discovery only applies to a volume without previous data. If the volumes
+already hold two standalone nodes from an earlier run, recreate them
+(`docker compose down -v`, which deletes the queues and messages stored in this
+local environment) or join manually with `rabbitmqctl join_cluster`.
+The cluster replicates metadata; queues are replicated only if they are declared
+as quorum queues or with a mirroring policy, so do not assume failover for the
+classic queues declared by this service.
 
 In the deployed AWS environment, the team has confirmed a RabbitMQ cluster.
 That cluster is external to this local Compose. Configure clients with the

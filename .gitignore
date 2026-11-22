@@ -3,6 +3,7 @@
 !.env.example
 target/
 .mvn/apache-maven-*/
+.mvn/apache-maven-*-bin.tar.gz
 build.log
 .git/
 .idea/
