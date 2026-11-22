@@ -3,12 +3,11 @@ package cl.campuslab.rabbitmq.data.service;
 import cl.campuslab.rabbitmq.config.MessagingNames;
 import cl.campuslab.rabbitmq.domain.service.RabbitAdminService;
 import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.Binding.DestinationType;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Exchange;
 import org.springframework.amqp.core.ExchangeTypes;
 import org.springframework.amqp.core.FanoutExchange;
-import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
@@ -74,12 +73,13 @@ public class RabbitAdminServiceImpl implements RabbitAdminService {
         String validatedExchange = validateName(exchange, "Exchange");
         String validatedRoutingKey = validateName(routingKey, "Routing key");
 
-        Queue queueInstance = QueueBuilder.durable(validatedQueue).build();
-        DirectExchange exchangeInstance = new DirectExchange(validatedExchange, true, false);
-
-        Binding binding = BindingBuilder.bind(queueInstance)
-                .to(exchangeInstance)
-                .with(validatedRoutingKey);
+        Binding binding = new Binding(
+                validatedQueue,
+                DestinationType.QUEUE,
+                validatedExchange,
+                validatedRoutingKey,
+                null
+        );
 
         rabbitAdmin.declareBinding(binding);
     }
@@ -90,11 +90,13 @@ public class RabbitAdminServiceImpl implements RabbitAdminService {
         String validatedExchange = validateName(exchange, "Exchange");
         String validatedRoutingKey = validateName(routingKey, "Routing key");
 
-        Queue queueInstance = new Queue(validatedQueue, true, false, false);
-        DirectExchange exchangeInstance = new DirectExchange(validatedExchange, true, false);
-        Binding binding = BindingBuilder.bind(queueInstance)
-                .to(exchangeInstance)
-                .with(validatedRoutingKey);
+        Binding binding = new Binding(
+                validatedQueue,
+                DestinationType.QUEUE,
+                validatedExchange,
+                validatedRoutingKey,
+                null
+        );
 
         rabbitAdmin.removeBinding(binding);
     }
