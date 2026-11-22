@@ -1,0 +1,190 @@
+openapi: 3.0.3
+
+info:
+  title: CampusLab Rabbit Admin API
+  version: 1.0.0
+  description: >-
+    API administrativa interna para colas, exchanges y bindings. No implementa
+    autenticación HTTP propia; el acceso debe restringirse en la red y en los
+    Security Groups del entorno.
+
+servers:
+  - url: http://localhost:8087
+
+paths:
+  /api/v1/rabbit/queues:
+    post:
+      summary: Crear cola
+      operationId: createQueue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQueueRequest'
+      responses:
+        '200':
+          description: Cola creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          description: Solicitud inválida
+
+  /api/v1/rabbit/queues/{name}:
+    delete:
+      summary: Eliminar cola
+      operationId: deleteQueue
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cola eliminada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/rabbit/exchanges:
+    post:
+      summary: Crear exchange
+      operationId: createExchange
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExchangeRequest'
+      responses:
+        '200':
+          description: Exchange creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          description: Solicitud inválida
+
+  /api/v1/rabbit/exchanges/{name}:
+    delete:
+      summary: Eliminar exchange
+      operationId: deleteExchange
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Exchange eliminado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/rabbit/bindings:
+    post:
+      summary: Crear binding
+      operationId: createBinding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BindingRequest'
+      responses:
+        '200':
+          description: Binding creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          description: Solicitud inválida
+
+    delete:
+      summary: Eliminar binding
+      operationId: deleteBinding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BindingRequest'
+      responses:
+        '200':
+          description: Binding eliminado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          description: Solicitud inválida
+
+components:
+  schemas:
+    CreateQueueRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+        durable:
+          type: boolean
+          default: true
+        deadLetterExchange:
+          type: string
+          description: Debe enviarse junto con deadLetterRoutingKey.
+        deadLetterRoutingKey:
+          type: string
+          description: Debe enviarse junto con deadLetterExchange.
+
+    CreateExchangeRequest:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          minLength: 1
+        type:
+          type: string
+          enum:
+            - direct
+            - topic
+            - fanout
+        durable:
+          type: boolean
+          default: true
+
+    BindingRequest:
+      type: object
+      required:
+        - queue
+        - exchange
+        - routingKey
+      properties:
+        queue:
+          type: string
+          minLength: 1
+        exchange:
+          type: string
+          minLength: 1
+        routingKey:
+          type: string
+          minLength: 1
+
+    ApiResponse:
+      type: object
+      properties:
+        message:
+          type: string

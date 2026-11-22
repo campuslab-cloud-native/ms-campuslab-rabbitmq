@@ -1,212 +1,83 @@
 # ms-campuslab-rabbitmq
 
-## Propósito
+RabbitMQ infrastructure and Rabbit Admin API for CampusLab.
 
-Este repositorio entrega la infraestructura de mensajería de CampusLab para la EC2 Messaging. Abarca:
+## Local Compose topology
 
-- broker RabbitMQ con Management UI
-- microservicio Spring Boot Rabbit Admin para gestionar queues, exchanges y bindings
-- topología oficial de CampusLab
-- dead-letter exchanges y DLQ para flujo de errores
+[`compose.yml`](./compose.yml) defines three services:
 
-No incluye lógica de negocio de notify, ni consumidores funcionales; ese comportamiento quedará en el backend de la EC2 Backend.
+| Service | Host ports | Purpose |
+|---|---|---|
+| `rabbitmq-1` | `5672`, `15672` | Broker used by Rabbit Admin in this Compose |
+| `rabbitmq-2` | `5673`, `15673` | Second independent broker container |
+| `rabbit-admin` | `8087` | Spring Boot API for dynamic queues, exchanges and bindings |
 
-## Arquitectura
+Both broker containers have separate data volumes. The Compose file does not
+join them into a RabbitMQ cluster; `rabbit-admin` connects only to
+`rabbitmq-1`. Do not infer replication or automatic failover from the two
+containers.
 
-```text
-Frontend Angular
-    |
-    v
-AWS API Gateway
-    |
-    v
-ms-campuslab-bff
-    |
-    +--> ms-campuslab-bookings
-    +--> ms-campuslab-catalog
-    +--> ms-campuslab-report
-    +--> ms-campuslab-audit
+In the deployed AWS environment, the team has confirmed a RabbitMQ cluster.
+That cluster is external to this local Compose. Configure clients with the
+deployment-provided DNS endpoint; this repository does not contain its
+addresses or establish a failover policy.
 
-ms-campuslab-bookings --> RabbitMQ --> ms-campuslab-notify
-```
+## Static topology and message flow
 
-En la EC2 Messaging se despliegan:
+`RabbitTopologyConfig` declares durable exchanges:
 
-- RabbitMQ broker
-- RabbitMQ Management UI
-- ms-campuslab-rabbitmq (Rabbit Admin)
+| Exchange | Type | Routing key | Queue |
+|---|---|---|---|
+| `cmd.direct` | `direct` | `email.send` | `q.cmd.email` |
+| `cmd.direct` | `direct` | `prep.ticket` | `q.cmd.prep` |
+| `cmd.direct` | `direct` | `voucher.gen` | `q.cmd.voucher` |
+| `cmd.topic` | `topic` | `email.*` | `q.cmd.email` |
+| `cmd.topic` | `topic` | `prep.#` | `q.cmd.prep` |
+| `cmd.topic` | `topic` | `voucher.*` | `q.cmd.voucher` |
+| `cmd.dead.dlx` | `direct` | `dead.email` | `q.cmd.email.dlq` |
+| `cmd.dead.dlx` | `direct` | `dead.prep` | `q.cmd.prep.dlq` |
+| `cmd.dead.dlx` | `direct` | `dead.voucher` | `q.cmd.voucher.dlq` |
 
-## Topología oficial
+Each main queue has `x-dead-letter-exchange=cmd.dead.dlx` and its matching
+dead-letter routing key. Bookings currently publishes to `cmd.direct` using
+`email.send`, `prep.ticket` and `voucher.gen`. Notify consumes the three main
+queues. No application consumer for the DLQ queues is defined in these
+repositories. The message envelope and operations are documented in
+[`asyncapi.yaml`](./asyncapi.yaml).
 
-### Exchanges
+## Rabbit Admin API and security
 
-```text
-cmd.direct        direct
-cmd.topic         topic
-cmd.dead.dlx      direct
-```
+The API is under `/api/v1/rabbit`; request bodies, responses and methods are
+specified in [`openapi.yaml`](./openapi.yaml). It creates/deletes queues,
+exchanges and bindings. It has no application-level authentication. Because
+these operations can change broker topology, restrict port `8087` to
+authorized operators using private networking and Security Group rules; do
+not expose it to `0.0.0.0/0`. Restrict Management UI port `15672` to operators
+as well. Port `5672` should be reachable only by the application services.
 
-### Colas principales
+## Configuration and ejecución local
 
-```text
-q.cmd.email
-q.cmd.prep
-q.cmd.voucher
-```
+`RABBITMQ_HOST` is `rabbitmq-1` for containers on the Compose network and
+`localhost` for a process running on the host. The Rabbit Admin Compose service
+is configured to use `rabbitmq-1`.
 
-### DLQ
-
-```text
-q.cmd.email.dlq
-q.cmd.prep.dlq
-q.cmd.voucher.dlq
-```
-
-### Bindings
-
-```text
-q.cmd.email -> cmd.direct -> email.send
-q.cmd.email -> cmd.topic -> email.*
-
-q.cmd.prep -> cmd.direct -> prep.ticket
-q.cmd.prep -> cmd.topic -> prep.#
-
-q.cmd.voucher -> cmd.direct -> voucher.gen
-q.cmd.voucher -> cmd.topic -> voucher.*
-```
-
-### DLQ routing keys
-
-```text
-dead.email
-dead.prep
-dead.voucher
-```
-
-Cada cola principal está configurada con `x-dead-letter-exchange=cmd.dead.dlx` y su routing key de DLQ correspondiente.
-
-## Rabbit Admin REST
-
-La API administrativa expone los recursos bajo el prefijo `/api/v1/rabbit`.
-
-### Endpoints
-
-```http
-POST   /api/v1/rabbit/queues
-DELETE /api/v1/rabbit/queues/{name}
-
-POST   /api/v1/rabbit/exchanges
-DELETE /api/v1/rabbit/exchanges/{name}
-
-POST   /api/v1/rabbit/bindings
-DELETE /api/v1/rabbit/bindings
-```
-
-## Variables de entorno
-
-Crear un archivo `.env` local con valores reales y no versionar secretos.
-
-```env
-RABBITMQ_USERNAME=guest
-RABBITMQ_PASSWORD=guest
-```
-
-El servicio Spring Boot usa:
-
-```text
-SERVER_PORT=8087
-RABBITMQ_HOST=rabbitmq
-RABBITMQ_PORT=5672
-RABBITMQ_USERNAME
-RABBITMQ_PASSWORD
-```
-
-## Ejecución local
-
-### 1. Preparar variables de entorno
-
-```bash
-cp .env.example .env
-```
-
-### 2. Ejecutar RabbitMQ y Rabbit Admin
-
-```bash
-docker compose up --build -d
-```
-
-### 3. Validar RabbitMQ UI
-
-```text
-http://localhost:15672
-```
-
-### 4. Validar Rabbit Admin
-
-```text
-http://localhost:8087/actuator/health
-```
-
-## Docker Compose
-
-La composición levanta dos contenedores:
-
-- `rabbitmq` con RabbitMQ 3 Management
-- `rabbit-admin` con el microservicio Spring Boot
-
-Puertos:
-
-```text
-5672   AMQP
-15672 RabbitMQ Management UI
-8087  Rabbit Admin API
-```
-
-## Pruebas rápidas
-
-```bash
-./mvnw clean test
-```
-
-## Validación Docker Compose
+Copy `.env.example` to `.env` for local development. Its `guest` values are
+development defaults only; provide deployment-managed credentials in AWS and
+do not commit them.
 
 ```bash
 docker compose config
+docker compose up --build -d
+docker compose ps
 ```
 
-## Security Groups recomendados para EC2 Messaging
+RabbitMQ and Rabbit Admin use `restart: unless-stopped`. The Management UI is
+available on `http://localhost:15672` and Rabbit Admin health on
+`http://localhost:8087/actuator/health`.
 
-```text
-22    SSH          origen: IP administrador
-5672  AMQP         origen: EC2 Backend Security Group
-15672 RabbitMQ UI  origen: IP administrador
-8087  Rabbit Admin origen: EC2 Backend Security Group / IP administrador
+Tests and Compose validation:
+
+```bash
+./mvnw clean test
+docker compose config
 ```
-
-No se recomienda abrir 5672 a 0.0.0.0/0.
-
-## Preparación para CI/CD
-
-El repositorio está organizado para facilitar un futuro workflow de CI/CD:
-
-- Maven con pruebas unitarias
-- Dockerfile para construir Rabbit Admin
-- `docker compose` para validar entorno
-- estructura simple y reproducible en EC2 Messaging
-
-## Archivos principales
-
-- `compose.yml`
-- `Dockerfile`
-- `asyncapi.yaml`
-- `application.properties`
-- `RabbitTopologyConfig.java`
-- `RabbitAdminController.java`
-- `RabbitAdminServiceImpl.java`
-
-## Consideraciones de operación
-
-- Se usan colas durables.
-- Se configuran DLQ y dead-letter bindings.
-- Se mantiene una topología declarativa clara.
-- El administrador REST solo gestiona recursos dinámicos; la topología oficial se declara en la configuración estática de Spring. 

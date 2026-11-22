@@ -1,64 +1,183 @@
 asyncapi: 2.6.0
-
 info:
   title: CampusLab RabbitMQ
-  version: 1.0.0
-  description: Topología oficial de mensajería para CampusLab.
+  version: 1.1.0
+  description: >-
+    Mensajes y destinos RabbitMQ implementados en CampusLab. Los productores
+    publican en exchanges; Notify consume las colas principales.
+
+defaultContentType: application/json
 
 servers:
   rabbitmq:
     url: localhost:5672
     protocol: amqp
+    description: Endpoint local de desarrollo.
 
 channels:
-  cmd.direct:
+  email.send:
+    description: >-
+      Routing key publicada por Bookings en cmd.direct; enruta a q.cmd.email.
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: cmd.direct
+          type: direct
+          durable: true
+        bindingVersion: '0.2.0'
     publish:
+      operationId: publishEmailCommand
       message:
-        $ref: '#/components/messages/CommandEnvelope'
+        $ref: '#/components/messages/NotificationMessage'
 
-  cmd.topic:
+  prep.ticket:
+    description: >-
+      Routing key publicada por Bookings en cmd.direct; enruta a q.cmd.prep.
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: cmd.direct
+          type: direct
+          durable: true
+        bindingVersion: '0.2.0'
     publish:
+      operationId: publishPreparationCommand
       message:
-        $ref: '#/components/messages/CommandEnvelope'
+        $ref: '#/components/messages/NotificationMessage'
 
-  cmd.dead.dlx:
-    subscribe:
+  voucher.gen:
+    description: >-
+      Routing key publicada por Bookings en cmd.direct; enruta a q.cmd.voucher.
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: cmd.direct
+          type: direct
+          durable: true
+        bindingVersion: '0.2.0'
+    publish:
+      operationId: publishVoucherCommand
       message:
-        $ref: '#/components/messages/CommandEnvelope'
+        $ref: '#/components/messages/NotificationMessage'
 
   q.cmd.email:
-    publish:
-      message:
-        $ref: '#/components/messages/CommandEnvelope'
-
-  q.cmd.email.dlq:
+    description: >-
+      Cola consumida por Notify. También tiene un binding estático desde
+      cmd.topic con routing key email.*.
+    bindings:
+      amqp:
+        is: queue
+        queue:
+          name: q.cmd.email
+          durable: true
+        bindingVersion: '0.2.0'
     subscribe:
+      operationId: consumeEmailCommand
       message:
-        $ref: '#/components/messages/CommandEnvelope'
+        $ref: '#/components/messages/NotificationMessage'
 
   q.cmd.prep:
-    publish:
-      message:
-        $ref: '#/components/messages/CommandEnvelope'
-
-  q.cmd.prep.dlq:
+    description: >-
+      Cola consumida por Notify. También tiene un binding estático desde
+      cmd.topic con routing key prep.#.
+    bindings:
+      amqp:
+        is: queue
+        queue:
+          name: q.cmd.prep
+          durable: true
+        bindingVersion: '0.2.0'
     subscribe:
+      operationId: consumePreparationCommand
       message:
-        $ref: '#/components/messages/CommandEnvelope'
+        $ref: '#/components/messages/NotificationMessage'
 
   q.cmd.voucher:
-    publish:
+    description: >-
+      Cola consumida por Notify. También tiene un binding estático desde
+      cmd.topic con routing key voucher.*.
+    bindings:
+      amqp:
+        is: queue
+        queue:
+          name: q.cmd.voucher
+          durable: true
+        bindingVersion: '0.2.0'
+    subscribe:
+      operationId: consumeVoucherCommand
       message:
-        $ref: '#/components/messages/CommandEnvelope'
+        $ref: '#/components/messages/NotificationMessage'
+
+  cmd.topic:
+    description: >-
+      Exchange topic durable configurado con los bindings email.* → q.cmd.email,
+      prep.# → q.cmd.prep y voucher.* → q.cmd.voucher. No hay productor de
+      aplicación para este exchange en los repositorios actuales.
+    x-rabbitmq-bindings:
+      - queue: q.cmd.email
+        routingKey: email.*
+      - queue: q.cmd.prep
+        routingKey: prep.#
+      - queue: q.cmd.voucher
+        routingKey: voucher.*
+
+  cmd.dead.dlx:
+    description: >-
+      Exchange dead-letter direct. RabbitMQ enruta aquí mensajes rechazados
+      desde las colas principales.
+    x-rabbitmq-bindings:
+      - queue: q.cmd.email.dlq
+        routingKey: dead.email
+      - queue: q.cmd.prep.dlq
+        routingKey: dead.prep
+      - queue: q.cmd.voucher.dlq
+        routingKey: dead.voucher
+
+  q.cmd.email.dlq:
+    description: >-
+      DLQ declarada y enlazada con cmd.dead.dlx mediante dead.email; no tiene
+      consumidor de aplicación en los repositorios actuales.
+    bindings:
+      amqp:
+        is: queue
+        queue:
+          name: q.cmd.email.dlq
+          durable: true
+        bindingVersion: '0.2.0'
+
+  q.cmd.prep.dlq:
+    description: >-
+      DLQ declarada y enlazada con cmd.dead.dlx mediante dead.prep; no tiene
+      consumidor de aplicación en los repositorios actuales.
+    bindings:
+      amqp:
+        is: queue
+        queue:
+          name: q.cmd.prep.dlq
+          durable: true
+        bindingVersion: '0.2.0'
 
   q.cmd.voucher.dlq:
-    subscribe:
-      message:
-        $ref: '#/components/messages/CommandEnvelope'
+    description: >-
+      DLQ declarada y enlazada con cmd.dead.dlx mediante dead.voucher; no tiene
+      consumidor de aplicación en los repositorios actuales.
+    bindings:
+      amqp:
+        is: queue
+        queue:
+          name: q.cmd.voucher.dlq
+          durable: true
+        bindingVersion: '0.2.0'
 
 components:
   messages:
-    CommandEnvelope:
+    NotificationMessage:
+      name: NotificationMessage
+      title: Comando de notificación
+      contentType: application/json
       payload:
         type: object
         required:
@@ -71,38 +190,15 @@ components:
         properties:
           type:
             type: string
-            description: Tipo del evento o comando.
           eventId:
             type: string
-            description: Identificador único del evento.
           timestamp:
             type: string
             format: date-time
-            description: Fecha y hora del evento.
           traceId:
             type: string
-            description: Identificador de trazabilidad.
           correlationId:
             type: string
-            description: Identificador de correlación.
           payload:
             type: object
             additionalProperties: true
-            description: Carga útil del comando.
-
-  bindings:
-    cmdDirect:
-      amqp:
-        is: routingKey
-        exchange: cmd.direct
-        bindingVersion: '0.1.0'
-    cmdTopic:
-      amqp:
-        is: routingKey
-        exchange: cmd.topic
-        bindingVersion: '0.1.0'
-    deadLetterBinding:
-      amqp:
-        is: routingKey
-        exchange: cmd.dead.dlx
-        bindingVersion: '0.1.0'
