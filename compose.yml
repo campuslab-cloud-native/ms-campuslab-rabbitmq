@@ -59,6 +59,7 @@ services:
 
 
   rabbit-admin:
+    image: campuslab/rabbit-admin:${CAMPUSLAB_VERSION:-1.0.0}
     build:
       context: .
       dockerfile: Dockerfile

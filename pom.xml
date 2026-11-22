@@ -13,7 +13,7 @@
 
     <groupId>cl.campuslab</groupId>
     <artifactId>ms-campuslab-rabbitmq</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>ms-campuslab-rabbitmq</name>
     <description>RabbitMQ broker and Rabbit Admin service for CampusLab</description>
 
